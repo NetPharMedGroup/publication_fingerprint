@@ -1,12 +1,31 @@
+from catboost import Pool, CatBoostRegressor
+from collections import defaultdict
+import copy
+from scipy.stats import pearsonr
+import datetime
+from mymodule import make_combo_fp, predict_synergy
 import numpy as np
 import pandas as pd
-import time
 import pickle
-from collections import defaultdict
 from progiter import ProgIter
-from catboost import Pool, CatBoostRegressor
-from scipy.stats import pearsonr
-from sklearn.metrics import mean_squared_error
+from scipy.stats.stats import pearsonr
+from sklearn import linear_model
+from sklearn.svm import SVR, LinearSVR
+from sklearn import neighbors
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.experimental import enable_hist_gradient_boosting 
+from sklearn.ensemble import HistGradientBoostingRegressor, GradientBoostingRegressor, RandomForestRegressor
+from sklearn.isotonic import IsotonicRegression
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import make_column_transformer, ColumnTransformer
+from sklearn.pipeline import make_pipeline, Pipeline, FeatureUnion
+from sklearn.metrics import make_scorer, mean_absolute_error, mean_squared_error
+from sklearn.model_selection import cross_validate, cross_val_score
+from xgboost import XGBRegressor
+import time
+import warnings
 
 def run_train(file, fp_name, cv=10, for_valid=0.4, ordered = False, ram_fraction=0.95, save=False, cv_params=None):
     cv_lower = 1
