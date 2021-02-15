@@ -16,22 +16,19 @@ from collections.abc import Iterable
 
 class SELU(nn.Module):
 
-    def __init__(self, alpha=1.6732632423543772848170429916717,
-                 scale=1.0507009873554804934193349852946, inplace=False):
+    def __init__(self, alpha=1.6732632423543772848170429916717, scale=1.0507009873554804934193349852946, inplace=False):
         super(SELU, self).__init__()
 
         self.scale = scale
         self.elu = nn.ELU(alpha=alpha, inplace=inplace)
 
     def forward(self, x):
-        return self.scale * self.elu(x)
+        return self.scale*self.elu(x)
 
 
 def ConvSELU(i, o, kernel_size=3, padding=0, p=0.):
-    model = [nn.Conv1d(i, o, kernel_size=kernel_size, padding=padding),
-             SELU(inplace=True)
-             ]
-    if p > 0.:
+    model = [nn.Conv1d(i, o, kernel_size=kernel_size, padding=padding), SELU(inplace=True)]
+    if p>0.0:
         model += [nn.Dropout(p)]
     return nn.Sequential(*model)
 
@@ -48,14 +45,13 @@ class Lambda(nn.Module):
     def forward(self, x):
         self.mu = self.z_mean(x)
         self.log_v = self.z_log_var(x)
-        eps = self.scale * Variable(torch.randn(*self.log_v.size())
-                                    ).type_as(self.log_v)
-        return self.mu + torch.exp(self.log_v / 2.) * eps
+        eps = self.scale*Variable(torch.randn(*self.log_v.size())).type_as(self.log_v)
+        return self.mu+torch.exp(self.log_v/2.0)*eps
 
 
 class MolEncoder(nn.Module):
 
-    def __init__(self, i=140, o=256, c=35):
+    def __init__(self, i=140, o=256, c=54):
         super(MolEncoder, self).__init__()
 
         self.i = i
@@ -63,7 +59,7 @@ class MolEncoder(nn.Module):
         self.conv_1 = ConvSELU(i, 9, kernel_size=9)
         self.conv_2 = ConvSELU(9, 9, kernel_size=9)
         self.conv_3 = ConvSELU(9, 10, kernel_size=11)
-        self.dense_1 = nn.Sequential(nn.Linear((c - 29 + 3) * 10, 435),
+        self.dense_1 = nn.Sequential(nn.Linear((c-29+3)*10, 435),
                                      SELU(inplace=True))
 
         self.lmbd = Lambda(435, o)
@@ -81,25 +77,21 @@ class MolEncoder(nn.Module):
         z_mean, z_log_var = self.lmbd.mu, self.lmbd.log_v
 
         bce = nn.BCELoss(reduction='mean')
-        xent_loss = self.i * bce(x_decoded_mean, x.detach())
-        kl_loss = -0.5 * torch.mean(1. + z_log_var - z_mean ** 2. -
-                                    torch.exp(z_log_var))
+        xent_loss = self.i*bce(x_decoded_mean, x.detach())
+        kl_loss = -0.5*torch.mean(1.0+z_log_var-z_mean**2.0-torch.exp(z_log_var))
 
         return kl_loss + xent_loss
 
 
 class MolDecoder(nn.Module):
 
-    def __init__(self, i=256, o=140, c=35):
+    def __init__(self, i=256, o=140, c=54):
         super(MolDecoder, self).__init__()
 
-        self.latent_input = nn.Sequential(nn.Linear(i, i),
-                                          SELU(inplace=True))
+        self.latent_input = nn.Sequential(nn.Linear(i, i), SELU(inplace=True))
         self.repeat_vector = Repeat(o)
         self.gru = nn.GRU(i, 501, 3, batch_first=True)
-        self.decoded_mean = TimeDistributed(nn.Sequential(nn.Linear(501, c),
-                                                          nn.Softmax(dim=-1))
-                                            )
+        self.decoded_mean = TimeDistributed(nn.Sequential(nn.Linear(501, c), nn.Softmax(dim=-1)))
 
     def forward(self, x):
         out = self.latent_input(x)
@@ -112,7 +104,7 @@ class MolDecoder(nn.Module):
 class Flatten(nn.Module):
 
     def forward(self, x):
-        size = x.size()  # read in N, C, H, W
+        size = x.size() 
         return x.view(size[0], -1)
 
 
@@ -125,7 +117,7 @@ class Repeat(nn.Module):
 
     def forward(self, x):
         size = tuple(x.size())
-        size = (size[0], 1) + size[1:]
+        size = (size[0], 1)+size[1:]
         x_expanded = x.view(*size)
         n = [1 for _ in size]
         n[1] = self.rep
@@ -144,36 +136,17 @@ class TimeDistributed(nn.Module):
         if len(x.size()) <= 2:
             return self.module(x)
 
-        # Squash samples and timesteps into a single axis
-        # (samples * timesteps, input_size)
         x_reshape = x.contiguous().view(-1, x.size(-1))
-
         y = self.module(x_reshape)
 
-        # We have to reshape Y
         if self.batch_first:
-            # (samples, timesteps, output_size)
             y = y.contiguous().view(x.size(0), -1, y.size(-1))
         else:
-            # (timesteps, samples, output_size)
             y = y.view(-1, x.size(1), y.size(-1))
 
         return y
 
-
-#def reset(m):
-#    if hasattr(m, 'reset_parameters'):
-#        m.reset_parameters()
-
-#def load_dataset(filename):
-#    with open(filename, 'rb') as f:
-#        dataset = pickle.load(f)
-#    
-#    return dataset
-
-
-def train_model(train_loader, encoder, decoder, optimizer, dtype,
-                print_every=100):
+def train_model(train_loader, encoder, decoder, optimizer, dtype, print_every=100):
     encoder.train()
     decoder.train()
 
@@ -183,8 +156,8 @@ def train_model(train_loader, encoder, decoder, optimizer, dtype,
         y_var = encoder(x_var)
         z_var = decoder(y_var)
         loss = encoder.vae_loss(z_var, x_var)
-        if (t + 1) % print_every == 0:
-            print('t = %d, loss = %.8f' % (t + 1, loss.data))
+        if (t+1) % print_every == 0:
+            print('t = %d, loss = %.8f'%(t+1, loss.data))
 
         optimizer.zero_grad()
         loss.backward()
@@ -205,7 +178,7 @@ def validate_model(val_loader, encoder, decoder, dtype):
 
         avg_val_loss += encoder.vae_loss(z_var, x_var).data
     avg_val_loss /= t
-    print('average validation loss: %.8f' % avg_val_loss)
+    print('average validation loss: %.8f'%avg_val_loss)
     return avg_val_loss
 
 
@@ -274,7 +247,7 @@ class ProcessSMILES(object):
             self.charset = None
             self.size_of_encoding = None
         if self.smiles is not None:
-            print(f'{len(self.smiles)} unique SMILES read in {round((t() - start),4)} seconds')
+            print(f'{len(self.smiles)} unique SMILES read in {round((t() - start), 4)} seconds')
         
     def _calculate_longest(self):
         max_len_smiles = max(self.smiles.map(len))

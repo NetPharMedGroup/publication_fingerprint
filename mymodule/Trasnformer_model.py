@@ -24,9 +24,9 @@ def evaluate(model, test_loader, vocab, PAD):
     model.eval()
     total_loss = 0
     for b, sm in enumerate(test_loader):
-        sm = torch.t(sm.cuda()) # (T,B)
+        sm = torch.t(sm.cuda()) 
         with torch.no_grad():
-            output = model(sm) # (T,B,V)
+            output = model(sm) 
         loss = F.nll_loss(output.view(-1, len(vocab)),
                                sm.contiguous().view(-1),
                                ignore_index=PAD)
@@ -40,10 +40,10 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         
-        # Compute the positional encodings once in log space.
-        pe = torch.zeros(max_len, d_model) # (T,H)
-        position = torch.arange(0., max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0., d_model, 2) * -(math.log(10000.0) / d_model))
+        # Compute the positional encodings  in log space.
+        pe = torch.zeros(max_len, d_model) 
+        position = torch.arange(0.0, max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0.0, d_model, 2) * -(math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
@@ -66,7 +66,6 @@ class TrfmSeq2seq(nn.Module):
         self.out = nn.Linear(hidden_size, out_size)
 
     def forward(self, src):
-        # src: (T,B)
         embedded = self.embed(src)  # (T,B,H)
         embedded = self.pe(embedded) # (T,B,H)
         hidden = self.trfm(embedded, embedded) # (T,B,H)
@@ -87,7 +86,7 @@ class TrfmSeq2seq(nn.Module):
             output = self.trfm.encoder.norm(output) # (T,B,H)
         output = output.detach().cpu().numpy()
         # mean, max, first*2
-        return np.hstack([np.mean(output, axis=0), np.max(output, axis=0), output[0,:,:], penul[0,:,:] ]) # (B,4H)
+        return np.hstack([np.mean(output, axis=0), np.max(output, axis=0), output[0,:,:], penul[0,:,:] ]) # (B, 4H)
     
     def encode(self, src):
         # src: (T,B)
@@ -98,7 +97,6 @@ def save_checkpoint(state, is_best, size=16, filename='/tf/notebooks/code_for_pu
     torch.save(state, name)
     if is_best:
         bestname = filename + str(size) + '_model_best.pth.tar'
-        #os.makedirs(os.path.dirname(dest_fpath), exist_ok=True)
         shutil.copyfile(name, bestname)
 
 class TorchVocab(object):
@@ -177,11 +175,9 @@ class Vocab(TorchVocab):
         self.mask_index = 4
         super().__init__(counter, specials=["<pad>", "<unk>", "<eos>", "<sos>", "<mask>"], max_size=max_size, min_freq=min_freq)
 
-    # override用
     def to_seq(self, sentece, seq_len, with_eos=False, with_sos=False) -> list:
         pass
 
-    # override用
     def from_seq(self, seq, join=False, with_pad=False):
         pass
 
@@ -246,22 +242,21 @@ class WordVocab(Vocab):
 
 class Seq2seqDataset(Dataset):
 
-    def __init__(self, smiles, vocab, seq_len=297):#,transform=Randomizer()):
+    def __init__(self, smiles, vocab, seq_len=297):
         self.smiles = smiles
         self.vocab = vocab
         self.seq_len = seq_len
-        #self.transform = transform
 
     def __len__(self):
         return len(self.smiles)
 
     def __getitem__(self, item):
         sm = self.smiles[item]
-        #sm = self.transform(sm) # List
         content = [self.vocab.stoi.get(token, self.vocab.unk_index) for token in sm]
         X = [self.vocab.sos_index] + content + [self.vocab.eos_index]
         padding = [self.vocab.pad_index]*(self.seq_len - len(X))
         X.extend(padding)
+        
         return torch.tensor(X)
 
 

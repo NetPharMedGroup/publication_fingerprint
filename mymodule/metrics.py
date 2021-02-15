@@ -91,7 +91,7 @@ def _pearsonr_ci(data, confidence=0.95):
 
 def make_confidence_data(bootstrap_reps=1000, test_type=None, log_file=None, normalizer_dict=None):
     '''
-    test type is t or bs
+    test_type: bs for BCa, t for t-stud, own for symmetric bootstrap, z for z-transform
     log_file should have data read from teh disk
     normalizer dict should have drugcomb-wide vals with iqr,range,sd
     '''

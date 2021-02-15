@@ -160,11 +160,11 @@ def highlight_min(s):
     return ['background-color: yellow' if v else '' for v in is_min]
 
 def color_second(s):
-    f = lambda x: x.nlargest(2)
+    f = lambda x: x.nlargest(3)
     return ['color: red' if v in f(s).values else 'color: black' for v in s]
 
 def color_second_min(s):
-    f = lambda x: x.nsmallest(2)
+    f = lambda x: x.nsmallest(3)
     return ['color: red' if v in f(s).values else 'color: black' for v in s]
 
 def color_lowest(s):

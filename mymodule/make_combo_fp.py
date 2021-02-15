@@ -36,7 +36,7 @@ class DataInput:
                               lineterminator='\n',
                               quotechar='"',
                               low_memory=False,
-                              usecols=['drug_row_cid','drug_col_cid','drug_col','drug_row',
+                              usecols=['block_id','drug_row_cid','drug_col_cid','drug_col','drug_row',
                                        'cell_line_name','css_ri','synergy_zip','synergy_bliss',
                                        'synergy_loewe','synergy_hsa']
                              )
@@ -72,21 +72,39 @@ class DataInput:
         print(f'dropped {b-a} rows after mapping to what we have in fps')
 
         
-    def calc_synergy(self):
+    def calc_synergy(self, agg_duplicate_smiles=True):
         a = self.df.shape[0]
         t1 = t()
-        temp = self.df['drug_row'] +" "+ self.df['drug_col'] # create a new string which combines drug_row and col
-        self.df['drug_row_col'] = temp.transform(str.split).transform(frozenset) # split by space, turn into set, make into a new column
-        self.df2 = self.df.groupby(["drug_row_col",'cell_line_name'], as_index=False).agg( #use new column to group
-            drug_row_id=   ('drug_row_id',   lambda x: min(np.unique(x))),
-            drug_col_id=   ('drug_col_id',   lambda x: max(np.unique(x))),
-            synergy_zip=   ('synergy_zip',   np.mean),
-            synergy_bliss= ('synergy_bliss', np.mean),
-            synergy_loewe= ('synergy_loewe', np.mean),
-            synergy_hsa=   ('synergy_hsa',   np.mean),
-            css_ri=        ('css_ri',        np.mean)
-        )
-        b = self.df2.shape[0]
+        if agg_duplicate_smiles==True:
+            temp = self.df['drug_row'] +" "+ self.df['drug_col'] # create a new string which combines drug_row and col
+            self.df['drug_row_col'] = temp.transform(str.split).transform(frozenset) # split by space, turn into set, make into a new column
+            self.df2 = self.df.groupby(["drug_row_col",'cell_line_name'], as_index=False).agg( #use new column to group
+                drug_row_id=   ('drug_row_id',   lambda x: min(np.unique(x))),
+                drug_col_id=   ('drug_col_id',   lambda x: max(np.unique(x))),
+                synergy_zip=   ('synergy_zip',   np.mean),
+                synergy_bliss= ('synergy_bliss', np.mean),
+                synergy_loewe= ('synergy_loewe', np.mean),
+                synergy_hsa=   ('synergy_hsa',   np.mean),
+                css_ri=        ('css_ri',        np.mean)
+            )
+            b = self.df2.shape[0]
+        else:
+            temp = self.df.groupby(['block_id'])[['synergy_zip','synergy_bliss','synergy_loewe','synergy_hsa']].mean()
+            self.df = self.df.drop_duplicates(subset=['block_id'], 
+                                                inplace=False)
+            self.df = self.df.drop(columns=['drug_col',
+                                              'drug_row', 
+                                              'drug_row_cid',
+                                              'drug_col_cid',
+                                              'synergy_zip',
+                                              'synergy_bliss',
+                                              'synergy_loewe',
+                                              'synergy_hsa'], 
+                                     inplace=False)
+            self.df.set_index('block_id', drop=True, inplace=True)
+            self.df2 = pd.concat((self.df, temp), axis=1)
+            b = self.df2.shape[0]
+        
         print(f'shrank dataset from {a} to {b} rows in {round((t()-t1), 2)} seconds')
         
         if self.bitaverage:
@@ -117,7 +135,10 @@ class DataInput:
                 columns = [ str(zz) + '_drugAveraged' for zz in range(0, int(self.holder.shape[1]), 1)]
             a = copy.deepcopy(self.holder)
             a = pd.DataFrame(a, columns=columns, index=self.df2.index)
-            b = self.df2.loc[:,['cell_line_name','drug_row_col', x]]
+            if agg_duplicate_smiles:
+                b = self.df2.loc[:,['cell_line_name','drug_row_col', x]]
+            else:
+                b = self.df2.loc[:,['cell_line_name', x]]
             out = pd.concat((b, a), axis=1)
             
             ready[x] = out

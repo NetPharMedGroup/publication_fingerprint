@@ -98,6 +98,17 @@ def run_train(file, fp_name, cv=10, for_valid=0.4, ordered = False, ram_fraction
                     pickle.dump(c, file)
     return c
 
+def scoring_func_p(y_true, y_pred):
+    return pearsonr(y_true, y_pred)[0]
+
+def scoring_func_m(y_true, y_pred):
+    return mean_squared_error(y_true, y_pred, squared=False)
+
+pearson = make_scorer(score_func=scoring_func_p, 
+                      greater_is_better=True)
+rmse = make_scorer(score_func=scoring_func_m, 
+                   greater_is_better=False)
+
 def run_train_all_sklearn(file, fp_name, cv=5, verbose=0, seed=1):
     
     np.random.seed(seed)
@@ -189,7 +200,7 @@ def run_train_all_sklearn(file, fp_name, cv=5, verbose=0, seed=1):
                 )
                 temp[name] = {
                     'test_pearsonr' : np.nanmean(cv_dict['test_pearsonr']), 
-                    'test_rmse' : abs(np.nanmean(cv_dict['test_rmse']))
+                    'test_rmse' : abs(np.nanmean(cv_dict['test_rmse'])) 
                 }
                 print(temp[name])
             print(f'{k} took {int(time.time()-start)/60} mins')
